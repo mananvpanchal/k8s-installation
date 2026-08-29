@@ -9,7 +9,7 @@ dnf update -y
 touch /etc/systemd/zram-generator.conf
 
 echo "Installing dependencies..."
-dnf install -y iptables iproute-tc
+dnf install -y iptables iproute-tc crio
     
 echo "Loading kernel modules..."
 cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
@@ -55,14 +55,16 @@ IP=$2
 
 hostnamectl set-hostname "$HOSTNAME"
 
-nmcli connection modify enp0s3 \
+CONNECTION=$(nmcli -g GENERAL.CONNECTION device show enp0s3)
+
+nmcli connection modify "$CONNECTION" \
     ipv4.method manual \
     ipv4.addresses ${IP}/24 \
     ipv4.gateway 192.168.1.1 \
     ipv4.dns 192.168.1.1 \
     ipv4.ignore-auto-dns yes
 
-nmcli connection up enp0s3
+nmcli connection up "$CONNECTION"
 
 echo
 echo "======================================="
