@@ -5,12 +5,13 @@ set -e
 echo "Updating system..."
 dnf update -y
 
-# disabling swap
+echo "Disabling swap..."
 touch /etc/systemd/zram-generator.conf
+swapoff -a
 
-echo "Installing dependencies..."
-dnf install -y iptables iproute-tc crio
-    
+echo "Installing iproute-tc..."
+dnf install -y containernetworking-plugins iproute-tc
+
 echo "Loading kernel modules..."
 cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
 overlay
@@ -29,15 +30,44 @@ EOF
 
 sysctl --system
 
-echo "Installing kubernetes..."
-dnf install -y kubernetes1.34 kubernetes1.34-client kubernetes1.34-kubeadm kubernetes1.34-systemd
-    
 echo "Configuring SELinux..."
-setenforce 0 || true
-sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+sudo setenforce 0
+sudo sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+
+sudo mkdir -p /etc/crio/crio.conf.d
+
+cat <<'EOF' | sudo tee /etc/crio/crio.conf.d/20-cni.conf
+[crio.network]
+plugin_dirs = [
+    "/usr/libexec/cni/",
+    "/opt/cni/bin/"
+]
+EOF
+
+cat <<'EOF' | sudo tee /etc/yum.repos.d/cri-o.repo
+[cri-o]
+name=CRI-O
+baseurl=https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v1.35/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://download.opensuse.org/repositories/isv:/cri-o:/stable:/v1.35/rpm/repodata/repomd.xml.key
+EOF
+
+cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://pkgs.k8s.io/core:/stable:/v1.35/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://pkgs.k8s.io/core:/stable:/v1.35/rpm/repodata/repomd.xml.key
+exclude=kubelet kubeadm kubectl cri-tools kubernetes-cni
+EOF
+
+echo "Installing cri-o and kubernetes..."
+dnf install -y cri-o
+dnf install -y kubelet kubeadm kubectl --setopt=disable_excludes=kubernetes
 
 echo "Starting services..."
-
 systemctl enable crio
 systemctl enable kubelet
 
@@ -70,3 +100,5 @@ echo
 echo "======================================="
 echo "Network configured."
 echo "======================================="
+echo "Restarting... in 1 min. Reconnect with IP: ${IP}, once up"
+sudo shutdown -r
