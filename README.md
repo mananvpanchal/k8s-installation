@@ -1,4 +1,4 @@
-## Kubernetes Cluster on Fedora 41 VirtualBox with Active Firewall (CRI-O + Flannel)
+## Kubernetes Cluster on Fedora 44 VirtualBox with Active Firewall (CRI-O + Flannel)
 
 This guide describes how to create a three-node Kubernetes cluster consisting of:
 
@@ -8,26 +8,25 @@ This guide describes how to create a three-node Kubernetes cluster consisting of
   - `computenode1` - `192.168.1.201`
   - `computenode2` - `192.168.1.202`
 
-### Assumptions
+### Assumptions and Values
 
 The scripts are written with the following assumptions
 
 - Gateway: `192.168.1.1`
 - DNS Server: `192.168.1.1`
-- All VMs are connected using Bridge Adapter
+- All VMs are connected using Bridge Adapter.
 
 And with the hard coded values
 
 - Pod CIDR: `10.244.0.0/16`
 - Service CIDR: `10.96.0.0/12`
 
-The following files are provided:
+### Preparation
 
-- `k8s-base.sh`
-- `k8s-control.sh`
-- `k8s-compute.sh`
-
-Check SSH connectivity from host to VMs, and VM to VM before proceeding.
+- Create a virtual box fedora server instance and call it master copy.
+- Copy **k8s-base.sh**, **k8s-control.sh** and **k8s-compute.sh** in your home dir.
+- Clone it into three fedora server instace and call it controlnode, computenode1 and computenode2.
+- Make sure all nodes are connected using Bridge Adapter.
 
 ---
 
@@ -97,7 +96,13 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
 ---
 
-## Step 5 - Verify the Control Plane
+## Step 5 - Install the Flannel CNI Plugin
+
+Install Flannel:
+
+```bash
+kubectl apply -f https://github.com/flannel-io/flannel/releases/download/v0.28.8/kube-flannel.yml
+```
 
 Verify that the control node is available:
 
@@ -112,16 +117,6 @@ NAME          STATUS
 controlnode   Ready
 ```
 
----
-
-## Step 6 - Install the Flannel CNI Plugin
-
-Install Flannel:
-
-```bash
-kubectl apply -f https://github.com/flannel-io/flannel/releases/download/v0.28.8/kube-flannel.yml
-```
-
 Wait until all system pods become healthy:
 
 ```bash
@@ -130,7 +125,7 @@ kubectl get pods -A
 
 ---
 
-## Step 7 - Prepare Compute Plane
+## Step 6 - Prepare Compute Plane
 
 Run the compute plane node setup script on **each compute plane node**.
 
@@ -140,7 +135,7 @@ sudo sh k8s-compute.sh
 
 ---
 
-## Step 8 - Join Compute Plane
+## Step 7 - Join Compute Plane
 
 From the output saved in **Step 3**, copy the generated `kubeadm join` command.
 
@@ -162,27 +157,7 @@ on control node.
 
 ---
 
-## Step 9 - Verify Cluster Nodes
-
-On the control node:
-
-```bash
-kubectl get nodes
-```
-
-Expected output:
-
-```text
-NAME            STATUS
-controlnode     Ready
-computenode1    Ready
-computenode2    Ready
-```
-**Restart cluster** (Shutdown computenodes first then controlnode, and start in reverse order)
-
----
-
-## Step 10 - Verify the Cluster
+## Step 8 - Verify the Cluster
 
 Run the verification commands contained in [k8s-verify.md](k8s-verify.md)
 
@@ -222,5 +197,5 @@ The verification covers:
 | Component | Value |
 |-----------|-------|
 | CNI | Flannel v0.28.8 |
-| Container Runtime | CRI-O |
-| Kubernetes Version | v1.34.x |
+| Container Runtime | CRI-O v1.35.x |
+| Kubernetes Version | v1.35.x |
